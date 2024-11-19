@@ -24,7 +24,7 @@ Item {
     required property int visualIndex
 
     signal clickItem(itemId: string, menuId: string)
-    signal dragFinished()
+    signal dragFinished
 
     Drag.active: mouseArea.drag.active
     Drag.source: root
@@ -38,20 +38,20 @@ Item {
     property int iconSize: Panel.rootObject.dockItemMaxSize * 9 / 14
 
     property var iconGlobalPoint: {
-        var a = icon
-        var x = 0, y = 0
-        while(a.parent) {
-            x += a.x
-            y += a.y
-            a = a.parent
+        var a = icon;
+        var x = 0, y = 0;
+        while (a.parent) {
+            x += a.x;
+            y += a.y;
+            a = a.parent;
         }
 
-        return Qt.point(x, y)
+        return Qt.point(x, y);
     }
 
     Item {
-        anchors.fill: parent
         id: appItem
+        anchors.fill: parent
         visible: !root.Drag.active // When in dragging, hide app item
         AppItemPalette {
             id: itemPalette
@@ -81,16 +81,16 @@ Item {
             visible: (root.displayMode === Dock.Efficient && root.windows.length > 1) || (root.displayMode === Dock.Fashion && root.windows.length > 0)
 
             function updateIndicatorAnchors() {
-                windowIndicator.anchors.top = undefined
-                windowIndicator.anchors.topMargin = 0
-                windowIndicator.anchors.bottom = undefined
-                windowIndicator.anchors.bottomMargin = 0
-                windowIndicator.anchors.left = undefined
-                windowIndicator.anchors.leftMargin = 0
-                windowIndicator.anchors.right = undefined
-                windowIndicator.anchors.rightMargin = 0
-                windowIndicator.anchors.horizontalCenter = undefined
-                windowIndicator.anchors.verticalCenter = undefined
+                windowIndicator.anchors.top = undefined;
+                windowIndicator.anchors.topMargin = 0;
+                windowIndicator.anchors.bottom = undefined;
+                windowIndicator.anchors.bottomMargin = 0;
+                windowIndicator.anchors.left = undefined;
+                windowIndicator.anchors.leftMargin = 0;
+                windowIndicator.anchors.right = undefined;
+                windowIndicator.anchors.rightMargin = 0;
+                windowIndicator.anchors.horizontalCenter = undefined;
+                windowIndicator.anchors.verticalCenter = undefined;
 
                 switch(Panel.position) {
                 case Dock.Top: {
@@ -121,14 +121,14 @@ Item {
             }
 
             Component.onCompleted: {
-                windowIndicator.updateIndicatorAnchors()
+                windowIndicator.updateIndicatorAnchors();
             }
         }
 
         Connections {
             function onPositionChanged() {
-                windowIndicator.updateIndicatorAnchors()
-                updateWindowIconGeometryTimer.start()
+                windowIndicator.updateIndicatorAnchors();
+                updateWindowIconGeometryTimer.start();
             }
             target: Panel
         }
@@ -144,7 +144,8 @@ Item {
                     delegate: LP.MenuItem {
                         text: modelData.name
                         onTriggered: {
-                            root.clickItem(root.itemId, modelData.id)
+                            var index = TaskManager.index(root.visualIndex);
+                            TaskManager.requestNewInstance(index, modelData.id);
                         }
                     }
                     onObjectAdded: (index, object) => contextMenu.insertItem(index, object)
@@ -179,13 +180,13 @@ Item {
                 direction: {
                     switch (Panel.position) {
                     case Dock.Top:
-                        return LaunchAnimation.Direction.Down
+                        return LaunchAnimation.Direction.Down;
                     case Dock.Bottom:
-                        return LaunchAnimation.Direction.Up
+                        return LaunchAnimation.Direction.Up;
                     case Dock.Left:
-                        return LaunchAnimation.Direction.Right
+                        return LaunchAnimation.Direction.Right;
                     case Dock.Right:
-                        return LaunchAnimation.Direction.Left
+                        return LaunchAnimation.Direction.Left;
                     }
                 }
                 target: icon
@@ -242,10 +243,22 @@ Item {
 
                         // 停顿
                         ParallelAnimation {
-                            NumberAnimation { target: rect; property: "width"; from: originSize * (index + 1); to: originSize * (index + 2); duration: 1200 }
-                            ColorAnimation { target: rect; property: "color"; from: Qt.rgba(1, 1, 1, 0.4); to: Qt.rgba(1, 1, 1, 0.1); duration: 1200 }
+                            NumberAnimation {
+                                target: rect
+                                property: "width"
+                                from: originSize * (index + 1)
+                                to: originSize * (index + 2)
+                                duration: 1200
+                            }
+                            ColorAnimation {
+                                target: rect
+                                property: "color"
+                                from: Qt.rgba(1, 1, 1, 0.4)
+                                to: Qt.rgba(1, 1, 1, 0.1)
+                                duration: 1200
+                            }
                         }
-                    } 
+                    }
 
                     // TODO Remove it because of consuming performance.
                     // D.BoxShadow {
@@ -285,7 +298,8 @@ Item {
         property int yOffset: 0
         onTriggered: {
             if (root.windows.length != 0 || Qt.platform.pluginName === "wayland") {
-                taskmanager.Applet.showItemPreview(root.itemId, Panel.rootObject, xOffset, yOffset, Panel.position)
+                var indexes = [taskmanager.Applet.index(root.visualIndex)];
+                taskmanager.Applet.requestPreview(indexes, Panel.rootObject, xOffset, yOffset, Panel.position);
             }
         }
     }
@@ -298,64 +312,67 @@ Item {
         drag.target: root
         drag.onActiveChanged: {
             if (!drag.active)
-                root.dragFinished()
+                root.dragFinished();
         }
 
         onPressed: function (mouse) {
             if (mouse.button === Qt.LeftButton) {
-                icon.grabToImage(function(result) {
+                icon.grabToImage(function (result) {
                     root.Drag.imageSource = result.url;
-                })
+                });
             }
-            toolTip.close()
-            closeItemPreview()
+            toolTip.close();
+            closeItemPreview();
         }
         onClicked: function (mouse) {
+            var index = TaskManager.index(root.visualIndex);
             if (mouse.button === Qt.RightButton) {
-                contextMenuLoader.active = true
-                MenuHelper.openMenu(contextMenuLoader.item)
+                contextMenuLoader.active = true;
+                MenuHelper.openMenu(contextMenuLoader.item);
             } else {
                 if (root.windows.length === 0) {
-                    launchAnimation.start()
+                    launchAnimation.start();
+                    TaskManager.requestNewInstance(index, "");
+                    return;
                 }
-                root.clickItem(root.itemId, "")
+                TaskManager.requestActivate(index);
             }
         }
 
         onEntered: {
             if (Qt.platform.pluginName === "xcb" && windows.length === 0) {
-                toolTipShowTimer.start()
-                return
+                toolTipShowTimer.start();
+                return;
             }
 
-            var itemPos = root.mapToItem(null, 0, 0)
-            let xOffset, yOffset, interval = 10
+            var itemPos = root.mapToItem(null, 0, 0);
+            let xOffset, yOffset, interval = 10;
             if (Panel.position % 2 === 0) {
-                xOffset = itemPos.x + (root.width / 2)
-                yOffset = (Panel.position == 2 ? -interval : interval + Panel.dockSize)
+                xOffset = itemPos.x + (root.width / 2);
+                yOffset = (Panel.position == 2 ? -interval : interval + Panel.dockSize);
             } else {
-                xOffset = (Panel.position == 1 ? -interval : interval + Panel.dockSize)
-                yOffset = itemPos.y + (root.height / 2)
+                xOffset = (Panel.position == 1 ? -interval : interval + Panel.dockSize);
+                yOffset = itemPos.y + (root.height / 2);
             }
-            previewTimer.xOffset = xOffset
-            previewTimer.yOffset = yOffset
-            previewTimer.start()
+            previewTimer.xOffset = xOffset;
+            previewTimer.yOffset = yOffset;
+            previewTimer.start();
         }
 
         onExited: {
             if (toolTipShowTimer.running) {
-                toolTipShowTimer.stop()
+                toolTipShowTimer.stop();
             }
 
             if (previewTimer.running) {
-                previewTimer.stop()
+                previewTimer.stop();
             }
 
             if (Qt.platform.pluginName === "xcb" && windows.length === 0) {
-                toolTip.close()
-                return
+                toolTip.close();
+                return;
             }
-            closeItemPreview()
+            closeItemPreview();
         }
 
         PanelToolTip {
@@ -369,26 +386,26 @@ Item {
             id: toolTipShowTimer
             interval: 50
             onTriggered: {
-                var point = root.mapToItem(null, root.width / 2, root.height / 2)
-                toolTip.DockPanelPositioner.bounding = Qt.rect(point.x, point.y, toolTip.width, toolTip.height)
-                toolTip.open()
+                var point = root.mapToItem(null, root.width / 2, root.height / 2);
+                toolTip.DockPanelPositioner.bounding = Qt.rect(point.x, point.y, toolTip.width, toolTip.height);
+                toolTip.open();
             }
         }
 
         function closeItemPreview() {
             if (previewTimer.running) {
-                previewTimer.stop()
+                previewTimer.stop();
             } else {
-                taskmanager.Applet.hideItemPreview()
+                taskmanager.Applet.hideItemPreview();
             }
         }
     }
 
     onWindowsChanged: {
-        updateWindowIconGeometryTimer.start()
+        updateWindowIconGeometryTimer.start();
     }
 
     onIconGlobalPointChanged: {
-        updateWindowIconGeometryTimer.start()
+        updateWindowIconGeometryTimer.start();
     }
 }

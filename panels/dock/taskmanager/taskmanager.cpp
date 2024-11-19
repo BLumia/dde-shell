@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "abstracttaskmanagerinterface.h"
 #include "appitem.h"
 
 #include "abstractwindow.h"
@@ -9,7 +10,8 @@
 #include "desktopfileamparser.h"
 #include "desktopfileparserfactory.h"
 #include "dockcombinemodel.h"
-#include "dockgroupmodel.h"
+#include "dockglobalelementmodel.h"
+#include "dockitemmodel.h"
 #include "dsglobal.h"
 #include "globals.h"
 #include "itemmodel.h"
@@ -38,7 +40,7 @@ Q_LOGGING_CATEGORY(taskManagerLog, "dde.shell.dock.taskmanager", QtInfoMsg)
                         >
 
 namespace dock {
-class BoolFilterModel : public QSortFilterProxyModel
+class BoolFilterModel : public QSortFilterProxyModel, public AbstractTaskManagerInterface
 {
     Q_OBJECT
 public:
@@ -47,6 +49,51 @@ public:
         , m_role(role)
     {
         setSourceModel(sourceModel);
+    }
+
+    void requestActivate(const QModelIndex &index) const override
+    {
+        callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestActivate);
+    }
+
+    void requestOpenUrls(const QModelIndex &index, const QList<QUrl> &urls) const override
+    {
+        callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestOpenUrls, urls);
+    }
+
+    void requestNewInstance(const QModelIndex &index, const QString &action) const override
+    {
+        callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestNewInstance, action);
+    }
+
+    void requestClose(const QModelIndex &index, bool force = false) const override
+    {
+        callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestClose, force);
+    }
+
+    void requestUpdateWindowGeometry(const QModelIndex &index, const QRect &geometry, QObject *delegate) const override
+    {
+        callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestUpdateWindowGeometry, geometry, delegate);
+    }
+
+    void requestPreview(const QModelIndexList &indexes,
+                        QObject *relativePositionItem,
+                        int32_t previewXoffset,
+                        int32_t previewYoffset,
+                        uint32_t direction) const override
+    {
+        return callInterfaceMethod(this,
+                                   indexes,
+                                   &AbstractTaskManagerInterface::requestPreview,
+                                   relativePositionItem,
+                                   previewXoffset,
+                                   previewYoffset,
+                                   direction);
+    }
+
+    void requestWindowsView(const QModelIndexList &indexes) const override
+    {
+        return callInterfaceMethod(this, indexes, &AbstractTaskManagerInterface::requestWindowsView);
     }
 
 protected:
@@ -67,23 +114,12 @@ TaskManager::TaskManager(QObject* parent)
     : DContainment(parent)
     , m_windowFullscreen(false)
 {
-    qRegisterMetaType<ObjectInterfaceMap>();
-    qDBusRegisterMetaType<ObjectInterfaceMap>();
-    qRegisterMetaType<ObjectMap>();
-    qDBusRegisterMetaType<ObjectMap>();
-    qDBusRegisterMetaType<QStringMap>();
-    qRegisterMetaType<QStringMap>();
-    qRegisterMetaType<PropMap>();
-    qDBusRegisterMetaType<PropMap>();
-    qDBusRegisterMetaType<QDBusObjectPath>();
-
     connect(Settings, &TaskManagerSettings::allowedForceQuitChanged, this, &TaskManager::allowedForceQuitChanged);
     connect(Settings, &TaskManagerSettings::windowSplitChanged, this, &TaskManager::windowSplitChanged);
 }
 
 bool TaskManager::load()
 {
-    loadDockedAppItems();
     auto platformName = QGuiApplication::platformName();
     if (QStringLiteral("wayland") == platformName) {
         m_windowMonitor.reset(new TreeLandWindowMonitor());
@@ -94,8 +130,6 @@ bool TaskManager::load()
         m_windowMonitor.reset(new X11WindowMonitor());
     }
 #endif
-
-    connect(m_windowMonitor.get(), &AbstractWindowMonitor::windowAdded, this, &TaskManager::handleWindowAdded);
     return true;
 }
 
@@ -116,8 +150,8 @@ bool TaskManager::init()
             auto roleNames = model->roleNames();
             QList<QByteArray> identifiedOrders = {MODEL_DESKTOPID, MODEL_STARTUPWMCLASS, MODEL_NAME, MODEL_ICONNAME};
 
-            auto indentifies = data.toStringList();
-            for (auto id : indentifies) {
+            auto identifies = data.toStringList();
+            for (auto id : identifies) {
                 if (id.isEmpty()) {
                     continue;
                 }
@@ -129,12 +163,12 @@ bool TaskManager::init()
                 }
             }
 
-            auto res = model->match(model->index(0, 0), roleNames.key(MODEL_DESKTOPID), indentifies.value(0), 1, Qt::MatchEndsWith);
+            auto res = model->match(model->index(0, 0), roleNames.key(MODEL_DESKTOPID), identifies.value(0), 1, Qt::MatchEndsWith);
             return res.value(0);
         });
 
-        m_dockItemModel = new DockItemModel(model, m_activeAppModel, this);
-        m_groupModel = new DockGroupModel(m_dockItemModel, TaskManager::ItemIdRole, this);
+        m_dockGlobalElementModel = new DockGlobalElementModel(model, m_activeAppModel, this);
+        m_itemModel = new DockItemModel(m_dockGlobalElementModel, nullptr);
     }
 
     connect(m_windowMonitor.data(), &AbstractWindowMonitor::windowFullscreenChanged, this, [this] (bool isFullscreen) {
@@ -151,64 +185,54 @@ bool TaskManager::init()
 
 QAbstractItemModel *TaskManager::dataModel()
 {
-    return m_groupModel;
+    return m_itemModel;
 }
 
-void TaskManager::handleWindowAdded(QPointer<AbstractWindow> window)
+void TaskManager::requestActivate(const QModelIndex &index) const
 {
-    if (!window || window->shouldSkip() || window->getAppItem() != nullptr) return;
-
-    // TODO: remove below code and use use model replaced.
-    QModelIndex res;
-    if (m_activeAppModel) {
-        res = m_activeAppModel->match(m_activeAppModel->index(0, 0), TaskManager::WinIdRole, window->id(), 1, Qt::MatchExactly).value(0);
-    }
-
-    QSharedPointer<DesktopfileAbstractParser> desktopfile = nullptr;
-    if (res.isValid()) {
-        desktopfile = DESKTOPFILEFACTORY::createById(res.data(TaskManager::DesktopIdRole).toString(), "amAPP");
-    }
-
-    if (desktopfile.isNull() || !desktopfile->isValied().first) {
-        desktopfile = DESKTOPFILEFACTORY::createByWindow(window);
-    }
-
-    auto appitem = desktopfile->getAppItem();
-
-    if (appitem.isNull() || (appitem->hasWindow() && windowSplit())) {
-        auto id = windowSplit() ? QString("%1@%2").arg(desktopfile->id()).arg(window->id()) : desktopfile->id();
-        appitem = new AppItem(id);
-    }
-
-    appitem->appendWindow(window);
-    appitem->setDesktopFileParser(desktopfile);
-
-    ItemModel::instance()->addItem(appitem);
+    m_itemModel->requestActivate(index);
 }
 
-void TaskManager::clickItem(const QString& itemId, const QString& menuId)
+void TaskManager::requestOpenUrls(const QModelIndex &index, const QList<QUrl> &urls) const
 {
-    auto item = ItemModel::instance()->getItemById(itemId);
-    if (!item) {
-        QProcess process;
-        process.setProcessChannelMode(QProcess::MergedChannels);
-        process.start("dde-am", {"--by-user", itemId, ""});
-        process.waitForFinished();
-        return;
-    }
+    m_itemModel->requestOpenUrls(index, urls);
+}
 
-    if (menuId == DOCK_ACTION_ALLWINDOW) {
-        QList<uint32_t> windowIds;
-        auto windows = item->data().toStringList();
-        std::transform(windows.begin(), windows.end(), std::back_inserter(windowIds), [](const QString &windowId) {
-            return windowId.toUInt();
-        });
+void TaskManager::requestNewInstance(const QModelIndex &index, const QString &action) const
+{
+    m_itemModel->requestNewInstance(index, action);
+}
 
-        m_windowMonitor->presentWindows(windowIds);
-        return;
-    }
+void TaskManager::requestClose(const QModelIndex &index, bool force) const
+{
+    m_itemModel->requestClose(index, force);
+}
 
-    item->handleClick(menuId);
+void TaskManager::requestUpdateWindowGeometry(const QModelIndex &index, const QRect &geometry, QObject *delegate) const
+{
+    m_itemModel->requestUpdateWindowGeometry(index, geometry, delegate);
+}
+
+void TaskManager::requestPreview(const QModelIndexList &indexes,
+                                 QObject *relativePositionItem,
+                                 int32_t previewXoffset,
+                                 int32_t previewYoffset,
+                                 uint32_t direction) const
+{
+    m_itemModel->requestPreview(indexes, relativePositionItem, previewXoffset, previewYoffset, direction);
+}
+void TaskManager::requestWindowsView(const QModelIndexList &indexes) const
+{
+    m_itemModel->requestWindowsView(indexes);
+}
+
+QModelIndex TaskManager::index(int row, int column, const QModelIndex &parent)
+{
+    return m_itemModel->index(row, column, parent);
+}
+
+void TaskManager::clickItem(const QString &itemId, const QString &menuId)
+{
 }
 
 void TaskManager::showItemPreview(const QString &itemId, QObject* relativePositionItem, int32_t previewXoffset, int32_t previewYoffset, uint32_t direction)
@@ -234,31 +258,6 @@ void TaskManager::setAppItemWindowIconGeometry(const QString& appid, QObject* re
 
     for (auto window : item->getAppendWindows()) {
         window->setWindowIconGeometry(qobject_cast<QWindow*>(relativePositionItem), QRect(QPoint(x1, y1),QPoint(x2, y2)));
-    }
-}
-
-void TaskManager::loadDockedAppItems()
-{
-    // TODO: add support for group and dir type
-    for (const auto& appValueRef : TaskManagerSettings::instance()->dockedDesktopFiles()) {
-        auto app = appValueRef.toObject();
-        auto appid = app.value("id").toString();
-        auto type = app.value("type").toString();
-        auto desktopfile = DESKTOPFILEFACTORY::createById(appid, type);
-        auto valid = desktopfile->isValied();
-
-        if (!valid.first) {
-            qInfo(taskManagerLog()) << "failed to load " << appid << " beacause " << valid.second;
-            continue;
-        }
-
-        auto appitem = desktopfile->getAppItem();
-        if (appitem.isNull()) {
-            appitem = new AppItem(appid);
-        }
-
-        appitem->setDesktopFileParser(desktopfile);
-        ItemModel::instance()->addItem(appitem);
     }
 }
 

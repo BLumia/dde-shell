@@ -70,6 +70,8 @@ add_library(dock-taskmanager SHARED ${DBUS_INTERFACES}
     dockcombinemodel.h
     dockitemmodel.cpp
     dockitemmodel.h
+    dockglobalelementmodel.cpp
+    dockglobalelementmodel.h
     dockgroupmodel.cpp
     dockgroupmodel.h
     taskmanager.cpp

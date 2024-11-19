@@ -5,7 +5,6 @@
 #include "rolegroupmodel.h"
 
 #include <QList>
-#include <qabstractitemmodel.h>
 
 RoleGroupModel::RoleGroupModel(QAbstractItemModel *sourceModel, int role, QObject *parent)
     : QAbstractProxyModel(parent)
@@ -98,7 +97,7 @@ void RoleGroupModel::setSourceModel(QAbstractItemModel *model)
             if (list == nullptr)
                 continue;
 
-            auto index = this->index(m_rowMap.indexOf(list), 0);
+            auto index = createIndex(list->indexOf(i), 0, m_rowMap.indexOf(list));
             Q_EMIT dataChanged(index, index, roles);
         }
     });
@@ -169,17 +168,22 @@ QModelIndex RoleGroupModel::parent(const QModelIndex &child) const
 QModelIndex RoleGroupModel::mapToSource(const QModelIndex &proxyIndex) const
 {
     auto parentIndex = proxyIndex.parent();
-    auto list = m_map.value(parentIndex.data(m_roleForDeduplication).toString(), nullptr);
+    QList<int> *list = nullptr;
 
-    if (list == nullptr || list->size() == 0) {
-        return QModelIndex();
+    if (parentIndex.isValid()) {
+        list = m_rowMap.value(parentIndex.row());
+    } else {
+        list = m_map.value(proxyIndex.data(m_roleForDeduplication).toString());
     }
+
+    if (nullptr == list)
+        return QModelIndex();
 
     if (parentIndex.isValid()) {
         return sourceModel()->index(list->value(proxyIndex.row()), 0);
     }
 
-    return sourceModel()->index(list->first(), 0);
+    return sourceModel()->index(list->value(0), 0);
 }
 
 QModelIndex RoleGroupModel::mapFromSource(const QModelIndex &sourceIndex) const
@@ -233,7 +237,6 @@ void RoleGroupModel::rebuildTreeSource()
 
 void RoleGroupModel::adjustMap(int base, int offset)
 {
-    auto newLength = sourceModel() ? sourceModel()->rowCount() : 0;
     for (int i = 0; i < m_rowMap.count(); ++i) {
         auto sourceRows = m_rowMap.value(i);
         for (int j = 0; j < sourceRows->size(); ++j) {

@@ -4,10 +4,11 @@
 
 #pragma once
 
+#include "abstracttaskmanagerinterface.h"
 #include "abstractwindow.h"
 #include "containment.h"
 #include "dockcombinemodel.h"
-#include "dockgroupmodel.h"
+#include "dockglobalelementmodel.h"
 #include "dockitemmodel.h"
 
 #include <QPointer>
@@ -15,7 +16,7 @@
 namespace dock {
 class AppItem;
 class AbstractWindowMonitor;
-class TaskManager : public DS_NAMESPACE::DContainment
+class TaskManager : public DS_NAMESPACE::DContainment, public AbstractTaskManagerInterface
 {
     Q_OBJECT
     Q_PROPERTY(QAbstractItemModel *dataModel READ dataModel NOTIFY dataModelChanged)
@@ -70,6 +71,21 @@ public:
     bool windowFullscreen();
     bool allowForceQuit();
 
+    Q_INVOKABLE void requestActivate(const QModelIndex &index) const override;
+    Q_INVOKABLE void requestNewInstance(const QModelIndex &index, const QString &action = QString()) const override;
+
+    Q_INVOKABLE void requestOpenUrls(const QModelIndex &index, const QList<QUrl> &urls) const override;
+    Q_INVOKABLE void requestClose(const QModelIndex &index, bool force = false) const override;
+    Q_INVOKABLE void requestUpdateWindowGeometry(const QModelIndex &index, const QRect &geometry, QObject *delegate = nullptr) const override;
+    Q_INVOKABLE void requestPreview(const QModelIndexList &indexes,
+                                    QObject *relativePositionItem,
+                                    int32_t previewXoffset,
+                                    int32_t previewYoffset,
+                                    uint32_t direction) const override;
+    Q_INVOKABLE void requestWindowsView(const QModelIndexList &indexes) const override;
+
+    Q_INVOKABLE QModelIndex index(int row, int column = 0, const QModelIndex &parent = QModelIndex());
+
     Q_INVOKABLE QString desktopIdToAppId(const QString& desktopId);
     Q_INVOKABLE bool requestDockByDesktopId(const QString& desktopID);
     Q_INVOKABLE bool requestUndockByDesktopId(const QString& desktopID);
@@ -89,18 +105,12 @@ Q_SIGNALS:
     void windowFullscreenChanged(bool);
     void allowedForceQuitChanged();
 
-private Q_SLOTS:
-    void handleWindowAdded(QPointer<AbstractWindow> window);
-
-private:
-    void loadDockedAppItems();
-
 private:
     QScopedPointer<AbstractWindowMonitor> m_windowMonitor;
     bool m_windowFullscreen;
     DockCombineModel *m_activeAppModel = nullptr;
-    DockItemModel *m_dockItemModel = nullptr;
-    DockGroupModel *m_groupModel = nullptr;
+    DockGlobalElementModel *m_dockGlobalElementModel = nullptr;
+    DockItemModel *m_itemModel = nullptr;
 };
 
 }
