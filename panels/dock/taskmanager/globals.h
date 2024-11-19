@@ -36,6 +36,7 @@ constexpr auto MODEL_ICONNAME = "iconName";
 constexpr auto MODEL_ITEMID = "itemId";
 constexpr auto MODEL_NAME = "name";
 constexpr auto MODEL_STARTUPWMCLASS = "startupWMClass";
+constexpr auto MODEL_ACTIONS = "actions";
 constexpr auto MODEL_MENUS = "menus";
 constexpr auto MODEL_DOCKED = "docked";
 constexpr auto MODEL_WINDOWS = "windows";

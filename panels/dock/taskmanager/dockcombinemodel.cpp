@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "dockcombinemodel.h"
+#include "abstracttaskmanagerinterface.h"
 #include "globals.h"
 #include "rolecombinemodel.h"
 #include "taskmanager.h"
@@ -18,7 +19,7 @@ DockCombineModel::DockCombineModel(QAbstractItemModel *major, QAbstractItemModel
                   {TaskManager::DesktopIdRole, RoleCombineModel::roleNames().key(MODEL_DESKTOPID)},
                   {TaskManager::IconNameRole, RoleCombineModel::roleNames().key(MODEL_ICONNAME)},
                   {TaskManager::IdentityRole, RoleCombineModel::roleNames().key(MODEL_IDENTIFY)},
-                  {TaskManager::MenusRole, RoleCombineModel::roleNames().key(MODEL_MENUS)},
+                  {TaskManager::ActionsRole, RoleCombineModel::roleNames().key(MODEL_ACTIONS)},
                   {TaskManager::NameRole, RoleCombineModel::roleNames().key(MODEL_NAME)},
                   {TaskManager::WinIdRole, RoleCombineModel::roleNames().key(MODEL_WINID)},
                   {TaskManager::WinTitleRole, RoleCombineModel::roleNames().key(MODEL_TITLE)}};
@@ -31,7 +32,7 @@ QHash<int, QByteArray> DockCombineModel::roleNames() const
             {TaskManager::DesktopIdRole, MODEL_DESKTOPID},
             {TaskManager::IconNameRole, MODEL_ICONNAME},
             {TaskManager::IdentityRole, MODEL_IDENTIFY},
-            {TaskManager::MenusRole, MODEL_MENUS},
+            {TaskManager::ActionsRole, MODEL_ACTIONS},
             {TaskManager::NameRole, MODEL_NAME},
             {TaskManager::WinIdRole, MODEL_WINID},
             {TaskManager::WinTitleRole, MODEL_TITLE}};
@@ -53,15 +54,11 @@ QVariant DockCombineModel::data(const QModelIndex &index, int role) const
         if (icon.isEmpty()) {
             icon = RoleCombineModel::data(index, m_roleMaps.value(TaskManager::WinIconRole)).toString();
         }
-        if (icon.isEmpty()) {
-            icon = DEFAULT_APP_ICONNAME;
-        }
         return icon;
     }
     default: {
         auto newRole = m_roleMaps.value(role, -1);
         if (newRole == -1) {
-            qWarning() << "failed!!!!!!!!" << static_cast<TaskManager::Roles>(role);
             return QVariant();
         }
 
@@ -70,5 +67,44 @@ QVariant DockCombineModel::data(const QModelIndex &index, int role) const
     }
 
     return QVariant();
+}
+
+void DockCombineModel::requestActivate(const QModelIndex &index) const
+{
+    callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestActivate);
+}
+
+void DockCombineModel::requestOpenUrls(const QModelIndex &index, const QList<QUrl> &urls) const
+{
+    callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestOpenUrls, urls);
+}
+
+void DockCombineModel::requestNewInstance(const QModelIndex &index, const QString &action) const
+{
+    callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestNewInstance, action);
+}
+
+void DockCombineModel::requestClose(const QModelIndex &index, bool force) const
+{
+    callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestClose, force);
+}
+
+void DockCombineModel::requestUpdateWindowGeometry(const QModelIndex &index, const QRect &geometry, QObject *delegate) const
+{
+    callInterfaceMethod(this, index, &AbstractTaskManagerInterface::requestUpdateWindowGeometry, geometry, delegate);
+}
+
+void DockCombineModel::requestPreview(const QModelIndexList &indexes,
+                                      QObject *relativePositionItem,
+                                      int32_t previewXoffset,
+                                      int32_t previewYoffset,
+                                      uint32_t direction) const
+{
+    callInterfaceMethod(this, indexes, &AbstractTaskManagerInterface::requestPreview, relativePositionItem, previewXoffset, previewYoffset, direction);
+}
+
+void DockCombineModel::requestWindowsView(const QModelIndexList &indexes) const
+{
+    callInterfaceMethod(this, indexes, &AbstractTaskManagerInterface::requestWindowsView);
 }
 }
