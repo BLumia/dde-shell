@@ -8,11 +8,12 @@
 #include "abstractwindowmonitor.h"
 #include "desktopfileamparser.h"
 #include "desktopfileparserfactory.h"
+#include "dockcombinemodel.h"
+#include "dockgroupmodel.h"
 #include "dsglobal.h"
 #include "globals.h"
 #include "itemmodel.h"
 #include "pluginfactory.h"
-#include "rolecombinemodel.h"
 #include "taskmanager.h"
 #include "taskmanageradaptor.h"
 #include "taskmanagersettings.h"
@@ -37,6 +38,30 @@ Q_LOGGING_CATEGORY(taskManagerLog, "dde.shell.dock.taskmanager", QtInfoMsg)
                         >
 
 namespace dock {
+class BoolFilterModel : public QSortFilterProxyModel
+{
+    Q_OBJECT
+public:
+    explicit BoolFilterModel(QAbstractItemModel *sourceModel, int role, QObject *parent = nullptr)
+        : QSortFilterProxyModel(parent)
+        , m_role(role)
+    {
+        setSourceModel(sourceModel);
+    }
+
+protected:
+    bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override
+    {
+        if (sourceRow > sourceModel()->rowCount())
+            return false;
+
+        QModelIndex index = sourceModel()->index(sourceRow, 0, sourceParent);
+        return !sourceModel()->data(index, m_role).toBool();
+    }
+
+private:
+    int m_role;
+};
 
 TaskManager::TaskManager(QObject* parent)
     : DContainment(parent)
@@ -83,45 +108,50 @@ bool TaskManager::init()
     DApplet::init();
 
     DS_NAMESPACE::DAppletBridge bridge("org.deepin.ds.dde-apps");
+    BoolFilterModel *leftModel = new BoolFilterModel(m_windowMonitor.data(), m_windowMonitor->roleNames().key("shouldSkip"), this);
     if (auto applet = bridge.applet()) {
         auto model = applet->property("appModel").value<QAbstractItemModel *>();
         Q_ASSERT(model);
-        m_activeAppModel =
-            new RoleCombineModel(m_windowMonitor.data(), model, AbstractWindow::identityRole, [](QVariant data, QAbstractItemModel *model) -> QModelIndex {
-                auto roleNames = model->roleNames();
-                QList<QByteArray> identifiedOrders = {"desktopId", "startupWMClass", "name", "iconName"};
+        m_activeAppModel = new DockCombineModel(leftModel, model, TaskManager::IdentityRole, [](QVariant data, QAbstractItemModel *model) -> QModelIndex {
+            auto roleNames = model->roleNames();
+            QList<QByteArray> identifiedOrders = {MODEL_DESKTOPID, MODEL_STARTUPWMCLASS, MODEL_NAME, MODEL_ICONNAME};
 
-                auto indentifies = data.toStringList();
-                for (auto id : indentifies) {
-                    if (id.isEmpty()) {
-                        continue;
-                    }
-
-                    for (auto identifiedOrder : identifiedOrders) {
-                        auto res = model->match(model->index(0, 0), roleNames.key(identifiedOrder), id, 1, Qt::MatchFixedString | Qt::MatchWrap);
-                        if (res.size() > 0 && res.first().isValid()) {
-                            return res.first();
-                        }
-                    }
+            auto indentifies = data.toStringList();
+            for (auto id : indentifies) {
+                if (id.isEmpty()) {
+                    continue;
                 }
 
-                return QModelIndex();
-            });
-    }
+                for (auto identifiedOrder : identifiedOrders) {
+                    auto res = model->match(model->index(0, 0), roleNames.key(identifiedOrder), id, 1, Qt::MatchFixedString | Qt::MatchWrap).value(0);
+                    if (res.isValid())
+                        return res;
+                }
+            }
 
-    if (m_windowMonitor)
-        m_windowMonitor->start();
+            auto res = model->match(model->index(0, 0), roleNames.key(MODEL_DESKTOPID), indentifies.value(0), 1, Qt::MatchEndsWith);
+            return res.value(0);
+        });
+
+        m_dockItemModel = new DockItemModel(model, m_activeAppModel, this);
+        m_groupModel = new DockGroupModel(m_dockItemModel, TaskManager::ItemIdRole, this);
+    }
 
     connect(m_windowMonitor.data(), &AbstractWindowMonitor::windowFullscreenChanged, this, [this] (bool isFullscreen) {
         m_windowFullscreen = isFullscreen;
         emit windowFullscreenChanged(isFullscreen);
     });
+
+    QTimer::singleShot(500, [this]() {
+        if (m_windowMonitor)
+            m_windowMonitor->start();
+    });
     return true;
 }
 
-ItemModel* TaskManager::dataModel()
+QAbstractItemModel *TaskManager::dataModel()
 {
-    return ItemModel::instance();
+    return m_groupModel;
 }
 
 void TaskManager::handleWindowAdded(QPointer<AbstractWindow> window)
@@ -129,19 +159,14 @@ void TaskManager::handleWindowAdded(QPointer<AbstractWindow> window)
     if (!window || window->shouldSkip() || window->getAppItem() != nullptr) return;
 
     // TODO: remove below code and use use model replaced.
-    QModelIndexList res;
+    QModelIndex res;
     if (m_activeAppModel) {
-        res = m_activeAppModel->match(m_activeAppModel->index(0, 0), AbstractWindow::winIdRole, window->id());
+        res = m_activeAppModel->match(m_activeAppModel->index(0, 0), TaskManager::WinIdRole, window->id(), 1, Qt::MatchExactly).value(0);
     }
 
     QSharedPointer<DesktopfileAbstractParser> desktopfile = nullptr;
-    QString desktopId;
-    if (res.size() > 0) {
-        desktopId = res.first().data(m_activeAppModel->roleNames().key("desktopId")).toString();
-    }
-
-    if (!desktopId.isEmpty()) {
-        desktopfile = DESKTOPFILEFACTORY::createById(desktopId, "amAPP");
+    if (res.isValid()) {
+        desktopfile = DESKTOPFILEFACTORY::createById(res.data(TaskManager::DesktopIdRole).toString(), "amAPP");
     }
 
     if (desktopfile.isNull() || !desktopfile->isValied().first) {
@@ -164,7 +189,13 @@ void TaskManager::handleWindowAdded(QPointer<AbstractWindow> window)
 void TaskManager::clickItem(const QString& itemId, const QString& menuId)
 {
     auto item = ItemModel::instance()->getItemById(itemId);
-    if(!item) return;
+    if (!item) {
+        QProcess process;
+        process.setProcessChannelMode(QProcess::MergedChannels);
+        process.start("dde-am", {"--by-user", itemId, ""});
+        process.waitForFinished();
+        return;
+    }
 
     if (menuId == DOCK_ACTION_ALLWINDOW) {
         QList<uint32_t> windowIds;

@@ -46,12 +46,17 @@ TaskManagerSettings::TaskManagerSettings(QObject *parent)
         } else if (TASKMANAGER_DOCKEDITEMS_KEY == key) {
             loadDockedItems();
             Q_EMIT dockedItemsChanged();
+        } else if (TASKMANAGER_DOCKEDELEMENTS_KEY == key) {
+            m_dockedElements = m_taskManagerDconfig->value(TASKMANAGER_DOCKEDELEMENTS_KEY, {}).toStringList();
+            Q_EMIT dockedElementsChanged();
         }
     });
 
     m_allowForceQuit = enableStr2Bool(m_taskManagerDconfig->value(TASKMANAGER_ALLOWFOCEQUIT_KEY).toString());
     m_windowSplit = enableStr2Bool(m_taskManagerDconfig->value(TASKMANAGER_WINDOWSPLIT_KEY).toString());
     loadDockedItems();
+    m_dockedElements = m_taskManagerDconfig->value(TASKMANAGER_DOCKEDELEMENTS_KEY, {}).toStringList();
+    qDebug() << m_dockedElements;
 }
 
 bool TaskManagerSettings::isAllowedForceQuit()
@@ -74,6 +79,11 @@ void TaskManagerSettings::setWindowSplit(bool split)
 {
     m_windowSplit = split;
     m_taskManagerDconfig->setValue(TASKMANAGER_WINDOWSPLIT_KEY, bool2EnableStr(m_windowSplit));
+}
+
+QStringList TaskManagerSettings::dockedElements()
+{
+    return m_dockedElements;
 }
 
 void TaskManagerSettings::dockedItemsPersisted()

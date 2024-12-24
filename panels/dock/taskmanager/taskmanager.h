@@ -5,29 +5,63 @@
 #pragma once
 
 #include "abstractwindow.h"
-#include "abstractwindowmonitor.h"
 #include "containment.h"
-#include "itemmodel.h"
-#include "rolecombinemodel.h"
+#include "dockcombinemodel.h"
+#include "dockgroupmodel.h"
+#include "dockitemmodel.h"
 
 #include <QPointer>
 
 namespace dock {
 class AppItem;
-
+class AbstractWindowMonitor;
 class TaskManager : public DS_NAMESPACE::DContainment
 {
     Q_OBJECT
-    Q_PROPERTY(ItemModel* dataModel READ dataModel NOTIFY dataModelChanged)
+    Q_PROPERTY(QAbstractItemModel *dataModel READ dataModel NOTIFY dataModelChanged)
 
     Q_PROPERTY(bool windowSplit READ windowSplit NOTIFY windowSplitChanged)
     Q_PROPERTY(bool windowFullscreen READ windowFullscreen NOTIFY windowFullscreenChanged)
     Q_PROPERTY(bool allowForceQuit READ allowForceQuit NOTIFY allowedForceQuitChanged)
 
 public:
+    enum Roles {
+        // abstract window
+        WinIdRole = Qt::UserRole + 1,
+        PidRole,
+        IdentityRole,
+        WinIconRole,
+        WinTitleRole,
+        ActiveRole,
+        ShouldSkipRole,
+        AttentionRole,
+
+        // item
+        ItemIdRole,
+        MenusRole,
+        WindowsRole,
+
+        // from dde-apps
+        DesktopIdRole = 0x1000,
+        NameRole,
+        IconNameRole,
+        StartUpWMClassRole,
+        NoDisplayRole,
+        ActionsRole,
+        DDECategoryRole,
+        InstalledTimeRole,
+        LastLaunchedTimeRole,
+        LaunchedTimesRole,
+        DockedRole,
+        OnDesktopRole,
+        AutoStartRole,
+        AppTypeRole,
+    };
+    Q_ENUM(Roles)
+
     explicit TaskManager(QObject* parent = nullptr);
 
-    ItemModel* dataModel();
+    QAbstractItemModel *dataModel();
 
     virtual bool init() override;
     virtual bool load() override;
@@ -63,8 +97,10 @@ private:
 
 private:
     QScopedPointer<AbstractWindowMonitor> m_windowMonitor;
-    RoleCombineModel *m_activeAppModel = nullptr;
     bool m_windowFullscreen;
+    DockCombineModel *m_activeAppModel = nullptr;
+    DockItemModel *m_dockItemModel = nullptr;
+    DockGroupModel *m_groupModel = nullptr;
 };
 
 }

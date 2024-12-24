@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "dsglobal.h"
-
 #include <QObject>
 #include <DConfig>
 #include <QScopedPointer>
@@ -33,6 +31,7 @@ public:
     void appnedDockedDesktopfiles(QJsonObject desktopfile);
     void removeDockedDesktopfile(QJsonObject desktopfile);
     QJsonArray dockedDesktopFiles();
+    QStringList dockedElements();
 
 private:
     explicit TaskManagerSettings(QObject *parent = nullptr);
@@ -43,6 +42,7 @@ Q_SIGNALS:
     void allowedForceQuitChanged();
     void windowSplitChanged();
     void dockedItemsChanged();
+    void dockedElementsChanged();
 
 private:
     DConfig* m_taskManagerDconfig;
@@ -50,5 +50,6 @@ private:
     bool m_allowForceQuit;
     bool m_windowSplit;
     QJsonArray m_dockedItems;
+    QStringList m_dockedElements;
 };
 }
