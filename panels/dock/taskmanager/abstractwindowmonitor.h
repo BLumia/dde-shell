@@ -50,7 +50,6 @@ public:
 
     virtual void presentWindows(QList<uint32_t> windowsId) = 0;
 
-    virtual void showItemPreview(const QPointer<AppItem>& item, QObject* relativePositionItem, int32_t previewXoffset, int32_t previewYoffset, uint32_t direction) = 0;
     virtual void hideItemPreview() = 0;
 
 Q_SIGNALS:

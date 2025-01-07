@@ -129,6 +129,23 @@ void DockItemModel::setSourceModel(QAbstractItemModel *model)
     m_isUpdating = false;
 }
 
+QModelIndex DockItemModel::getItemIndexById(const QString &id)
+{
+    for (int i = 0; i < rowCount(); ++i) {
+        if (id == data(index(i, 0), TaskManager::DesktopIdRole)) {
+            return index(i, 0);
+        }
+    }
+    return QModelIndex();
+}
+
+void DockItemModel::dumpItemInfo(const QModelIndex &index)
+{
+    qDebug() << "Index in DockItemModel:" << index
+             << "DesktopIdRole:" << data(index, TaskManager::DesktopIdRole)
+             << "DockedRole:" << data(index, TaskManager::DockedRole);
+}
+
 QHash<int, QByteArray> DockItemModel::roleNames() const
 {
     return m_globalModel->roleNames();

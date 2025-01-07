@@ -38,6 +38,9 @@ public:
                         uint32_t direction) const override;
     void requestWindowsView(const QModelIndexList &indexes) const override;
 
+    QModelIndex getItemIndexById(const QString &id);
+    void dumpItemInfo(const QModelIndex &index);
+
 private:
     QAbstractItemModel *m_globalModel;
     QScopedPointer<QAbstractItemModel> m_groupModel;
