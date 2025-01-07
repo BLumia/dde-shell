@@ -130,6 +130,43 @@ bool TaskManager::load()
         m_windowMonitor.reset(new X11WindowMonitor());
     }
 #endif
+
+    // TODO: remove this after all ItemModel::instance() usage are removed.
+    connect(m_windowMonitor.get(), &AbstractWindowMonitor::windowAdded, this, [this](QPointer<AbstractWindow> window){
+        if (!window || window->shouldSkip() || window->getAppItem() != nullptr) return;
+
+        // TODO: remove below code and use use model replaced.
+        QModelIndexList res;
+        if (m_activeAppModel) {
+            res = m_activeAppModel->match(m_activeAppModel->index(0, 0), TaskManager::WinIdRole, window->id());
+        }
+
+        QSharedPointer<DesktopfileAbstractParser> desktopfile = nullptr;
+        QString desktopId;
+        if (res.size() > 0) {
+            desktopId = res.first().data(m_activeAppModel->roleNames().key("desktopId")).toString();
+        }
+
+        if (!desktopId.isEmpty()) {
+            desktopfile = DESKTOPFILEFACTORY::createById(desktopId, "amAPP");
+        }
+
+        if (desktopfile.isNull() || !desktopfile->isValied().first) {
+            desktopfile = DESKTOPFILEFACTORY::createByWindow(window);
+        }
+
+        auto appitem = desktopfile->getAppItem();
+
+        if (appitem.isNull() || (appitem->hasWindow() && windowSplit())) {
+            auto id = windowSplit() ? QString("%1@%2").arg(desktopfile->id()).arg(window->id()) : desktopfile->id();
+            appitem = new AppItem(id);
+        }
+
+        appitem->appendWindow(window);
+        appitem->setDesktopFileParser(desktopfile);
+
+        ItemModel::instance()->addItem(appitem);
+    });
     return true;
 }
 
@@ -183,7 +220,7 @@ bool TaskManager::init()
     return true;
 }
 
-QAbstractItemModel *TaskManager::dataModel()
+DockItemModel *TaskManager::dataModel()
 {
     return m_itemModel;
 }
@@ -233,17 +270,6 @@ QModelIndex TaskManager::index(int row, int column, const QModelIndex &parent)
 
 void TaskManager::clickItem(const QString &itemId, const QString &menuId)
 {
-}
-
-void TaskManager::showItemPreview(const QString &itemId, QObject* relativePositionItem, int32_t previewXoffset, int32_t previewYoffset, uint32_t direction)
-{
-    auto item = ItemModel::instance()->getItemById(itemId).get();
-    if (!item) return;
-
-    QPointer<AppItem> pItem = reinterpret_cast<AppItem*>(item);
-    if (pItem.isNull()) return;
-
-    m_windowMonitor->showItemPreview(pItem, relativePositionItem, previewXoffset, previewYoffset, direction);
 }
 
 void TaskManager::hideItemPreview()
