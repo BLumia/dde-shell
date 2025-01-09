@@ -54,8 +54,8 @@ TaskManagerSettings::TaskManagerSettings(QObject *parent)
 
     m_allowForceQuit = enableStr2Bool(m_taskManagerDconfig->value(TASKMANAGER_ALLOWFOCEQUIT_KEY).toString());
     m_windowSplit = enableStr2Bool(m_taskManagerDconfig->value(TASKMANAGER_WINDOWSPLIT_KEY).toString());
-    loadDockedItems();
     m_dockedElements = m_taskManagerDconfig->value(TASKMANAGER_DOCKEDELEMENTS_KEY, {}).toStringList();
+    loadDockedItems();
     qDebug() << m_dockedElements;
 }
 
@@ -106,6 +106,8 @@ void TaskManagerSettings::dockedItemsPersisted()
 
 void TaskManagerSettings::loadDockedItems()
 {
+    if (!m_dockedElements.isEmpty()) return;
+
     while (!m_dockedItems.isEmpty()) m_dockedItems.removeLast();
 
     auto dcokedDesktopFilesStrList = m_taskManagerDconfig->value(TASKMANAGER_DOCKEDITEMS_KEY).toStringList();
@@ -125,6 +127,17 @@ void TaskManagerSettings::loadDockedItems()
             dockedItem[QString::fromStdString(key)] = QString::fromStdString(value);
         }
         m_dockedItems.append(dockedItem);
+    }
+
+    // Migrate data under the new dconfig setting entry
+    if (!m_dockedItems.isEmpty() && m_dockedElements.isEmpty()) {
+        for (auto dockedDesktopFile : m_dockedItems) {
+            if (!dockedDesktopFile.isObject()) continue;
+            auto dockedDesktopFileObj = dockedDesktopFile.toObject();
+            if (dockedDesktopFileObj.contains(QStringLiteral("id")) && dockedDesktopFileObj.contains(QStringLiteral("type"))) {
+                m_dockedElements.append(QStringLiteral("desktop/%1").arg(dockedDesktopFileObj[QStringLiteral("id")].toString()));
+            }
+        }
     }
 }
 
