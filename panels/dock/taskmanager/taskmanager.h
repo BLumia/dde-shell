@@ -62,7 +62,7 @@ public:
 
     explicit TaskManager(QObject* parent = nullptr);
 
-    DockItemModel *dataModel();
+    DockItemModel *dataModel() const;
 
     virtual bool init() override;
     virtual bool load() override;
@@ -98,6 +98,8 @@ public:
     Q_INVOKABLE void hideItemPreview();
 
     Q_INVOKABLE void setAppItemWindowIconGeometry(const QString& appid, QObject* relativePositionItem, const int& x1, const int& y1, const int& x2, const int& y2);
+
+    Q_INVOKABLE void dumpItemInfo(const QModelIndex &index) const;
 
 Q_SIGNALS:
     void dataModelChanged();

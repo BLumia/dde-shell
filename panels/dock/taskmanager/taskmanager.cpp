@@ -195,12 +195,15 @@ bool TaskManager::init()
 
                 for (auto identifiedOrder : identifiedOrders) {
                     auto res = model->match(model->index(0, 0), roleNames.key(identifiedOrder), id, 1, Qt::MatchFixedString | Qt::MatchWrap).value(0);
-                    if (res.isValid())
+                    if (res.isValid()) {
+                        qCDebug(taskManagerLog) << "matched" << res;
                         return res;
+                    }
                 }
             }
 
             auto res = model->match(model->index(0, 0), roleNames.key(MODEL_DESKTOPID), identifies.value(0), 1, Qt::MatchEndsWith);
+            qCDebug(taskManagerLog) << "matched" << res.value(0);
             return res.value(0);
         });
 
@@ -220,7 +223,7 @@ bool TaskManager::init()
     return true;
 }
 
-DockItemModel *TaskManager::dataModel()
+DockItemModel *TaskManager::dataModel() const
 {
     return m_itemModel;
 }
@@ -256,6 +259,9 @@ void TaskManager::requestPreview(const QModelIndexList &indexes,
                                  int32_t previewYoffset,
                                  uint32_t direction) const
 {
+    for (auto index : indexes) {
+        qDebug()  << "requestPreview" << index << index.model() << (index.model() == m_itemModel);
+    }
     m_itemModel->requestPreview(indexes, relativePositionItem, previewXoffset, previewYoffset, direction);
 }
 void TaskManager::requestWindowsView(const QModelIndexList &indexes) const
@@ -292,6 +298,11 @@ void TaskManager::setAppItemWindowIconGeometry(const QString& appid, QObject* re
     for (auto window : item->getAppendWindows()) {
         window->setWindowIconGeometry(qobject_cast<QWindow*>(relativePositionItem), QRect(QPoint(x1, y1),QPoint(x2, y2)));
     }
+}
+
+void TaskManager::dumpItemInfo(const QModelIndex &index) const
+{
+    dataModel()->dumpItemInfo(index);
 }
 
 bool TaskManager::allowForceQuit()

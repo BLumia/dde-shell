@@ -71,6 +71,7 @@ ContainmentItem {
             }
             delegate: DropArea {
                 id: delegateRoot
+                required property int index
                 required property bool active
                 required property bool attention
                 required property string itemId
@@ -80,7 +81,7 @@ ContainmentItem {
                 required property list<string> windows
                 keys: ["text/x-dde-dock-dnd-appid"]
                 z: attention ? -1 : 0
-                property bool visibility: itemId !== taskmanager.Applet.desktopIdToAppId(launcherDndDropArea.launcherDndDesktopId)
+                property bool visibility: true//itemId !== taskmanager.Applet.desktopIdToAppId(launcherDndDropArea.launcherDndDesktopId)
 
                 states: [
                     State {
@@ -98,89 +99,104 @@ ContainmentItem {
                 Behavior on opacity { NumberAnimation { duration: 200 } }
                 Behavior on scale { NumberAnimation { duration: 200 } }
 
-                // TODO: 临时溢出逻辑，待后面修改
-                implicitWidth: useColumnLayout ? taskmanager.implicitWidth : visualModel.cellWidth
-                implicitHeight: useColumnLayout ? visualModel.cellWidth : taskmanager.implicitHeight
+                // // TODO: 临时溢出逻辑，待后面修改
+                // implicitWidth: useColumnLayout ? taskmanager.implicitWidth : visualModel.cellWidth
+                // implicitHeight: useColumnLayout ? visualModel.cellWidth : taskmanager.implicitHeight
+                implicitWidth: itemHolder.width
+                implicitHeight: itemHolder.height
 
                 onEntered: function(drag) {
-                    visualModel.items.move((drag.source as AppItem).visualIndex, app.visualIndex)
+                    visualModel.items.move(drag.source.DelegateModel.itemsIndex, delegateRoot.DelegateModel.itemsIndex)
                 }
 
                 property int visualIndex: DelegateModel.itemsIndex
+                property var modelIndex: visualModel.modelIndex(index)
 
-                AppItem {
-                    id: app
-                    displayMode: Panel.indicatorStyle
-                    colorTheme: Panel.colorTheme
-                    active: delegateRoot.active
-                    attention: delegateRoot.attention
-                    itemId: delegateRoot.itemId
-                    name: delegateRoot.name
-                    iconName: delegateRoot.iconName
-                    menus: delegateRoot.menus
-                    windows: delegateRoot.windows
-                    visualIndex: delegateRoot.visualIndex
-                    ListView.delayRemove: Drag.active
-                    Component.onCompleted: {
-                        clickItem.connect(taskmanager.Applet.clickItem)
-                        dropFilesOnItem.connect(taskmanager.Applet.dropFilesOnItem)
+                Row {
+                    id: itemHolder
+                    AppItem {
+                        id: app
+                        displayMode: Panel.indicatorStyle
+                        colorTheme: Panel.colorTheme
+                        active: delegateRoot.active
+                        attention: delegateRoot.attention
+                        itemId: delegateRoot.itemId
+                        name: delegateRoot.name
+                        iconName: delegateRoot.iconName
+                        menus: delegateRoot.menus
+                        windows: delegateRoot.windows
+                        visualIndex: delegateRoot.visualIndex
+                        modelIndex: delegateRoot.modelIndex
+                        ListView.delayRemove: Drag.active
+                        Component.onCompleted: {
+                            clickItem.connect(taskmanager.Applet.clickItem)
+                            dropFilesOnItem.connect(taskmanager.Applet.dropFilesOnItem)
+                        }
+                        onDragFinished: function() {
+                            launcherDndDropArea.resetDndState()
+                        }
+
+                        implicitWidth: useColumnLayout ? Panel.rootObject.dockItemMaxSize : visualModel.cellWidth
+                        implicitHeight: useColumnLayout ? visualModel.cellWidth : Panel.rootObject.dockItemMaxSize
+
+                        Drag.source: delegateRoot
                     }
-                    onDragFinished: function() {
-                        launcherDndDropArea.resetDndState()
+                    Label {
+                        visible: taskmanager.Applet.windowSplit && !taskmanager.useColumnLayout
+                        anchors.verticalCenter: itemHolder.verticalCenter
+                        text: delegateRoot.name + `(${delegateRoot.index})`
                     }
-                    anchors.fill: parent // This is mandatory for draggable item center in drop area
                 }
             }
         }
 
-        DropArea {
-            id: launcherDndDropArea
-            anchors.fill: parent
-            keys: ["text/x-dde-dock-dnd-appid"]
-            property string launcherDndDesktopId: ""
-            property string launcherDndDragSource: ""
+        // DropArea {
+        //     id: launcherDndDropArea
+        //     anchors.fill: parent
+        //     keys: ["text/x-dde-dock-dnd-appid"]
+        //     property string launcherDndDesktopId: ""
+        //     property string launcherDndDragSource: ""
 
-            function resetDndState() {
-                launcherDndDesktopId = ""
-                launcherDndDragSource = ""
-            }
+        //     function resetDndState() {
+        //         launcherDndDesktopId = ""
+        //         launcherDndDragSource = ""
+        //     }
 
-            onEntered: function(drag) {
-                let desktopId = drag.getDataAsString("text/x-dde-dock-dnd-appid")
-                launcherDndDragSource = drag.getDataAsString("text/x-dde-dock-dnd-source")
-                launcherDndDesktopId = desktopId
-                if (taskmanager.Applet.requestDockByDesktopId(desktopId) === false) {
-                    resetDndState()
-                }
-            }
+        //     onEntered: function(drag) {
+        //         let desktopId = drag.getDataAsString("text/x-dde-dock-dnd-appid")
+        //         launcherDndDragSource = drag.getDataAsString("text/x-dde-dock-dnd-source")
+        //         launcherDndDesktopId = desktopId
+        //         if (taskmanager.Applet.requestDockByDesktopId(desktopId) === false) {
+        //             resetDndState()
+        //         }
+        //     }
 
-            onPositionChanged: function(drag) {
-                if (launcherDndDesktopId === "") return
-                let curX = taskmanager.useColumnLayout ? drag.y : drag.x
-                let cellWidth = visualModel.cellWidth
-                let curCell = curX / cellWidth
-                let appId = taskmanager.Applet.desktopIdToAppId(launcherDndDesktopId)
-                taskmanager.Applet.dataModel.moveTo(appId, curCell)
-            }
+        //     onPositionChanged: function(drag) {
+        //         if (launcherDndDesktopId === "") return
+        //         let curX = taskmanager.useColumnLayout ? drag.y : drag.x
+        //         let cellWidth = visualModel.cellWidth
+        //         let curCell = curX / cellWidth
+        //         let appId = taskmanager.Applet.desktopIdToAppId(launcherDndDesktopId)
+        //         taskmanager.Applet.dataModel.moveTo(appId, curCell)
+        //     }
 
-            onDropped: function(drop) {
-                Panel.contextDragging = false
-                if (launcherDndDesktopId === "") return
-                let curX = taskmanager.useColumnLayout ? drop.y : drop.x
-                let cellWidth = visualModel.cellWidth
-                let curCell = curX / cellWidth
-                let appId = taskmanager.Applet.desktopIdToAppId(launcherDndDesktopId)
-                taskmanager.Applet.dataModel.moveTo(appId, curCell)
-                resetDndState()
-            }
+        //     onDropped: function(drop) {
+        //         if (launcherDndDesktopId === "") return
+        //         let curX = taskmanager.useColumnLayout ? drop.y : drop.x
+        //         let cellWidth = visualModel.cellWidth
+        //         let curCell = curX / cellWidth
+        //         let appId = taskmanager.Applet.desktopIdToAppId(launcherDndDesktopId)
+        //         taskmanager.Applet.dataModel.moveTo(appId, curCell)
+        //         resetDndState()
+        //     }
 
-            onExited: function() {
-                if (launcherDndDesktopId !== "" && launcherDndDragSource !== "taskbar") {
-                    taskmanager.Applet.requestUndockByDesktopId(launcherDndDesktopId)
-                }
-                resetDndState()
-            }
-        }
+        //     onExited: function() {
+        //         if (launcherDndDesktopId !== "" && launcherDndDragSource !== "taskbar") {
+        //             taskmanager.Applet.requestUndockByDesktopId(launcherDndDesktopId)
+        //         }
+        //         resetDndState()
+        //     }
+        // }
     }
 
     Component.onCompleted: {
