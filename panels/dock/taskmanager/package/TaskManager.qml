@@ -32,12 +32,14 @@ ContainmentItem {
 
     implicitWidth: useColumnLayout ? Panel.rootObject.dockSize : (Math.min(remainingSpacesForTaskManager, appContainer.implicitWidth) + forceRelayoutWorkaround)
     implicitHeight: useColumnLayout ? (Math.min(remainingSpacesForTaskManager, appContainer.implicitHeight) + forceRelayoutWorkaround) : Panel.rootObject.dockSize
+    clip: true
 
     OverflowContainer {
         id: appContainer
         anchors.fill: parent
         useColumnLayout: taskmanager.useColumnLayout
-        spacing: Panel.rootObject.itemSpacing + visualModel.count % 2
+        interactive: true
+        spacing: Panel.rootObject.itemSpacing
         add: Transition {
             NumberAnimation {
                 properties: "scale,opacity"
@@ -77,6 +79,7 @@ ContainmentItem {
                 required property string itemId
                 required property string name
                 required property string iconName
+                required property string title
                 required property string menus
                 required property list<string> windows
                 keys: ["text/x-dde-dock-dnd-appid"]
@@ -142,9 +145,12 @@ ContainmentItem {
                         Drag.source: delegateRoot
                     }
                     Label {
-                        visible: taskmanager.Applet.windowSplit && !taskmanager.useColumnLayout
+                        visible: taskmanager.Applet.windowSplit && !taskmanager.useColumnLayout && (delegateRoot.windows.length > 0)
                         anchors.verticalCenter: itemHolder.verticalCenter
-                        text: delegateRoot.name + `(${delegateRoot.index})`
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        width: Math.min(100, implicitWidth)
+                        text: delegateRoot.title !== "" ? `${delegateRoot.title}(${delegateRoot.index})` : delegateRoot.name
                     }
                 }
             }
