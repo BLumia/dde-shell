@@ -102,9 +102,9 @@ ContainmentItem {
                 Behavior on opacity { NumberAnimation { duration: 200 } }
                 Behavior on scale { NumberAnimation { duration: 200 } }
 
-                // // TODO: 临时溢出逻辑，待后面修改
-                // implicitWidth: useColumnLayout ? taskmanager.implicitWidth : visualModel.cellWidth
-                // implicitHeight: useColumnLayout ? visualModel.cellWidth : taskmanager.implicitHeight
+                anchors.horizontalCenter: useColumnLayout ? parent.horizontalCenter : undefined
+
+                // TODO: 临时溢出逻辑，待后面修改
                 implicitWidth: itemHolder.width
                 implicitHeight: itemHolder.height
 
@@ -136,7 +136,7 @@ ContainmentItem {
                             dropFilesOnItem.connect(taskmanager.Applet.dropFilesOnItem)
                         }
                         onDragFinished: function() {
-                            launcherDndDropArea.resetDndState()
+                            // launcherDndDropArea.resetDndState()
                         }
 
                         implicitWidth: useColumnLayout ? Panel.rootObject.dockItemMaxSize : visualModel.cellWidth
@@ -153,6 +153,54 @@ ContainmentItem {
                         text: delegateRoot.title !== "" ? `${delegateRoot.title}(${delegateRoot.index})` : delegateRoot.name
                     }
                 }
+            }
+        }
+
+        Button {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            visible: !appContainer.atViewBeginning
+            width: Panel.rootObject.dockSize
+            height: Panel.rootObject.dockSize
+            icon.name: useColumnLayout ? "arrow-up" : "arrow-left"
+            onClicked: {
+                appContainer.scrollDecrease()
+            }
+        }
+
+        Button {
+            anchors.top: useColumnLayout ? undefined : parent.top
+            anchors.right: parent.right
+            anchors.bottom: useColumnLayout ? parent.bottom : undefined
+            visible: !appContainer.atViewEnd
+            width: Panel.rootObject.dockSize
+            height: Panel.rootObject.dockSize
+            icon.name: useColumnLayout ? "arrow-down" : "arrow-right"
+            onClicked: {
+                appContainer.scrollIncrease()
+            }
+        }
+
+        Component.onCompleted: {
+            appContainer.forceLayout()
+        }
+
+        Timer {
+            id: relayoutTimer
+            interval: 2000
+            running: false
+            repeat: false
+            onTriggered: {
+                console.log("hit")
+                appContainer.forceLayout()
+            }
+        }
+
+        Connections {
+            target: taskmanager.Applet
+            function onWindowSplitChanged() {
+                console.log("windowSplitChanged")
+                relayoutTimer.restart()
             }
         }
 

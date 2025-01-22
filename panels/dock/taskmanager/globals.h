@@ -17,7 +17,7 @@ constexpr auto DOCK_ACTION_DOCK = "dock-action-dock";
 
 // setting keys
 constexpr auto TASKMANAGER_ALLOWFOCEQUIT_KEY = "Allow_Force_Quit";
-constexpr auto TASKMANAGER_WINDOWSPLIT_KEY = "Window_Split";
+constexpr auto TASKMANAGER_WINDOWSPLIT_KEY = "noTaskGrouping";
 constexpr auto TASKMANAGER_DOCKEDITEMS_KEY = "Docked_Items";
 constexpr auto TASKMANAGER_DOCKEDELEMENTS_KEY = "Docked_Elements";
 
