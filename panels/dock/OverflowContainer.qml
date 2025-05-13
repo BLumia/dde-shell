@@ -51,6 +51,7 @@ Item {
         verticalLayoutDirection: ListView.TopToBottom
         boundsBehavior: Flickable.StopAtBounds
         interactive: false
+        cacheBuffer: 100
         ScrollBar.horizontal: ScrollBar {
             id: hsb
             enabled: !root.useColumnLayout

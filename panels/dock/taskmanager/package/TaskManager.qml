@@ -33,6 +33,13 @@ ContainmentItem {
     implicitWidth: useColumnLayout ? Panel.rootObject.dockSize : (Math.min(remainingSpacesForTaskManager, appContainer.implicitWidth) + forceRelayoutWorkaround)
     implicitHeight: useColumnLayout ? (Math.min(remainingSpacesForTaskManager, appContainer.implicitHeight) + forceRelayoutWorkaround) : Panel.rootObject.dockSize
     clip: true
+    Rectangle {
+        id: contentItem
+        anchors.fill: parent
+        border.color: "green"
+        color: "transparent"
+        z: 999
+    }
 
     OverflowContainer {
         id: appContainer
@@ -78,6 +85,7 @@ ContainmentItem {
                 required property bool attention
                 required property string itemId
                 required property string name
+                required property string icon
                 required property string iconName
                 required property string title
                 required property string menus

@@ -152,6 +152,7 @@ QHash<int, QByteArray> DockGlobalElementModel::roleNames() const
         {TaskManager::DockedRole, MODEL_DOCKED},
         {TaskManager::WindowsRole, MODEL_WINDOWS},
         {TaskManager::WinTitleRole, MODEL_TITLE},
+        {TaskManager::WinIconRole, MODEL_WINICON},
         {TaskManager::WinIdRole, MODEL_WINID},
     };
 }
